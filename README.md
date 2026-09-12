@@ -1,11 +1,38 @@
-# TypeSafe JavaScript SDK
+# TypeSafe AI JavaScript SDK
 
-The JavaScript and TypeScript SDK for the TypeSafe API.
+JavaScript and TypeScript SDK for [TypeSafe AI](https://typesafe.ai).
 
-This is a placeholder package used to initialize npm publishing for
-`@typesafe-ai/sdk`. It contains no SDK implementation and is not ready for use.
+## Quickstart
 
-Version `0.0.0-bootstrap.0` is reserved for this setup step. The first SDK release
-will replace this README with installation instructions and API documentation.
+Install the SDK (Node.js 20 or newer):
 
-[TypeSafe documentation](https://docs.typesafe.ai)
+```sh
+npm install @typesafe-ai/sdk
+```
+
+Set `TYPESAFE_API_KEY` in your environment, then create and use the client:
+
+```ts
+import { choice, TypeSafeClient } from "@typesafe-ai/sdk";
+
+const client = new TypeSafeClient();
+const response = await client.systemOne({
+  state: { document: "I was charged twice. Please fix this ASAP." },
+  questions: {
+    category: choice("What is this ticket about?", {
+      billing: null,
+      technical: null,
+      other: null,
+    }),
+  },
+});
+
+console.log(response.answers.category.choice);
+```
+
+Answer types are inferred from your questions. The package includes ESM, CommonJS, and TypeScript declarations.
+
+## Documentation
+
+Learn what TypeSafe can do in the [TypeSafe docs](https://docs.typesafe.ai/).
+See the SDK's [client](src/client.ts) and [types](src/types.ts) for API options and defaults.

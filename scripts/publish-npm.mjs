@@ -6,7 +6,8 @@ import { readdirSync, readFileSync } from "node:fs";
 
 const files = readdirSync("release").filter((file) => file.endsWith(".tgz"));
 if (files.length !== 1) throw new Error("Expected exactly one release tarball");
-const tarball = `release/${files[0]}`;
+// The ./ prefix prevents npm from interpreting this as GitHub owner/repository shorthand.
+const tarball = `./release/${files[0]}`;
 const { name, version } = JSON.parse(readFileSync("package.json", "utf8"));
 const integrity = `sha512-${createHash("sha512").update(readFileSync(tarball)).digest("base64")}`;
 const existing = spawnSync("npm", ["view", `${name}@${version}`, "dist.integrity", "--json"], {

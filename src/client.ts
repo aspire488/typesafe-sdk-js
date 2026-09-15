@@ -14,7 +14,7 @@ import {
   redactHeaders,
   withLevel,
 } from "./logging";
-import { toWireQuestions } from "./questions";
+import { validateQuestions } from "./questions";
 import { Models } from "./resources/models";
 import {
   DEFAULT_RETRY_POLICY,
@@ -294,7 +294,7 @@ export class TypeSafeClient {
    * @param request - State, questions, and an optional model override.
    * @param options - Per-call timeout, retry, headers, and cancellation settings.
    * @returns Answers typed by question name and criteria, with model and token usage.
-   * @throws {TypeSafeError} Questions or score criteria are empty, or score keys are invalid.
+   * @throws {TypeSafeError} Questions are empty, or score criteria are not a list of at least two entries.
    * @throws {APIError} The server returns a non-2xx response after retries.
    * @throws {APIConnectionError} The request cannot connect or times out after retries.
    * @throws {APIUserAbortError} The caller aborts the request.
@@ -312,10 +312,10 @@ export class TypeSafeClient {
     request: SystemOneRequest<Q>,
     options: RequestOptions = {},
   ): APIPromise<SystemOneResult<Q>> {
+    validateQuestions(request.questions);
     const body = {
       ...request,
       model: request.model ?? this.defaultModel,
-      questions: toWireQuestions(request.questions),
     } satisfies SystemOneRequestPayload;
 
     return this.#request<SystemOneResult<Q>>("POST", "/v1/systemone", {

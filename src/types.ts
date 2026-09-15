@@ -45,16 +45,8 @@ export interface ChoiceQuestion<T extends ChoiceCriteria = ChoiceCriteria> {
   criteria: T;
 }
 
-/** A nonempty array indexed by score from zero; `null` leaves a score undescribed. */
-export type ScoreList = readonly [EntryType, ...EntryType[]];
-
-/** Score descriptions keyed from zero with no gaps; `null` leaves a score undescribed. */
-export type ScoreMap = {
-  readonly [score: number]: EntryType;
-};
-
-/** An ordered rubric expressed as an array or score map. */
-export type ScoreCriteria = ScoreList | ScoreMap;
+/** At least two descriptions indexed by score from zero; `null` leaves a score undescribed. */
+export type ScoreCriteria = readonly [EntryType, EntryType, ...EntryType[]];
 
 /** A question that assigns a score using an ordered rubric. */
 export interface ScoreQuestion<T extends ScoreCriteria = ScoreCriteria> {
@@ -97,12 +89,10 @@ export interface ChoiceResponse<T extends ChoiceCriteria = ChoiceCriteria> {
   };
 }
 
-/** Score keys inferred from the rubric; tuple keys are numeric strings, map keys are numbers. */
-export type ScoreOf<T extends ScoreCriteria> = T extends readonly unknown[]
-  ? number extends T["length"]
-    ? number
-    : Extract<keyof T, `${number}`>
-  : Extract<keyof T, number>;
+/** Score keys inferred from the rubric; a fixed-length tuple yields its indices, otherwise `number`. */
+export type ScoreOf<T extends ScoreCriteria> = number extends T["length"]
+  ? number
+  : Extract<keyof T, `${number}`>;
 
 /** Rubric descriptions keyed by score. */
 export type ScoreLegend<T extends ScoreCriteria> = {
@@ -166,7 +156,6 @@ export interface ModelCard {
  * State and named questions for `systemOne`.
  *
  * Additional properties on a request variable are forwarded, including `null` values.
- * Score maps are converted to arrays before sending.
  */
 export interface SystemOneRequest<Q extends Questions = Questions> {
   /** Text, a JSON object or array, or `null` to evaluate. */

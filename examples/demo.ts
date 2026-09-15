@@ -22,11 +22,11 @@ try {
         angry: null,
       }),
       urgency: score("How urgent is this ticket?", ["can wait", "this week", "today", "right now"]),
-      refundRisk: score("How likely is the customer to demand a refund?", {
-        0: "unlikely",
-        1: "possible",
-        2: "likely",
-      }),
+      refundRisk: score("How likely is the customer to demand a refund?", [
+        "unlikely",
+        "possible",
+        "likely",
+      ]),
     },
   });
 

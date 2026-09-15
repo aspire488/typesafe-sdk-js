@@ -69,9 +69,9 @@ describe("release regressions", () => {
     expect(headers.has("x-typesafe-retry-count")).toBe(false);
   });
 
-  it("preserves own __proto__ questions through score-map normalization without mutation", async () => {
+  it("preserves own __proto__ questions without mutation", async () => {
     const questions = JSON.parse('{"__proto__":{"type":"noul","instructions":"?"}}');
-    questions.score = score("?", { 0: "no", 1: "yes" });
+    questions.score = score("?", ["no", "yes"]);
     const original = JSON.stringify(questions);
     const { fetch, requests } = mockFetch(() => json({}));
     await new TypeSafeClient({ apiKey: "k", fetch }).systemOne({ state: "s", questions });

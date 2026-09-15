@@ -1,6 +1,6 @@
 {
   "name": "@typesafe-ai/sdk",
-  "version": "0.5.7",
+  "version": "0.6.0",
   "description": "TypeScript SDK for the TypeSafe API",
   "license": "MIT",
   "author": "evinism",

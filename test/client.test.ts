@@ -312,32 +312,26 @@ describe("question builders", () => {
     expect(r.answers.q.choice).toBe("b");
   });
 
-  it("score keeps whichever shape it was given", () => {
+  it("score keeps the list it was given and rejects maps", () => {
     expect(score("q", ["bad", "good"]).criteria).toEqual(["bad", "good"]);
-    expect(score("q", { 0: "bad", 1: "good" }).criteria).toEqual({ 0: "bad", 1: "good" });
+    // biome-ignore lint/suspicious/noExplicitAny: deliberately malformed, as a JS caller might send
+    expect(() => score("q", { 0: "bad", 1: "good" } as any)).toThrow(
+      "Score criteria must be a list of descriptions indexed by score from zero, not a map.",
+    );
   });
 });
 
 describe("wire format", () => {
-  it("preserves null state, instructions, and criteria values during normalization", async () => {
+  it("preserves null state, instructions, and criteria values", async () => {
     const { fetch, requests } = mockFetch(() => json(SYSTEM_ONE_RESPONSE));
     const questions = {
       noul: noul(null, { true: null, false: null }),
       noCriteria: noul(null, null),
       choice: choice(null, { yes: null, no: null }),
-      list: score(null, [null, "high"]),
-      map: score(null, { 1: "high", 0: null }),
+      score: score(null, [null, "high"]),
     };
     await new TypeSafeClient({ apiKey: "k", fetch }).systemOne({ state: null, questions });
-    expect(requests[0]?.body).toEqual({
-      model: DEFAULT_MODEL,
-      state: null,
-      questions: {
-        ...questions,
-        map: { type: "score", instructions: null, criteria: [null, "high"] },
-      },
-    });
-    expect(questions.map.criteria).toEqual({ 0: null, 1: "high" });
+    expect(requests[0]?.body).toEqual({ model: DEFAULT_MODEL, state: null, questions });
   });
 
   it("allows omitted instructions and preserves JSON arrays", async () => {
@@ -345,7 +339,7 @@ describe("wire format", () => {
     const questions = {
       noul: { type: "noul", criteria: null },
       choice: { type: "choice", criteria: { yes: [null, { example: true }] } },
-      score: { type: "score", criteria: { 0: [null, "low"], 1: null } },
+      score: { type: "score", criteria: [[null, "low"], null] },
       arrayInstructions: noul([null, { examples: [1, false] }], { true: ["yes", null] }),
       defaultInstructions: noul(),
     } satisfies Questions;
@@ -356,7 +350,6 @@ describe("wire format", () => {
       state,
       questions: {
         ...questions,
-        score: { type: "score", criteria: [[null, "low"], null] },
         defaultInstructions: { type: "noul", instructions: null },
       },
     });
@@ -381,43 +374,24 @@ describe("wire format", () => {
     expect(wire.q?.criteria).toEqual(["bad", "ok", "great"]);
   });
 
-  it("converts a well-formed score map to a list", async () => {
-    const wire = await send({ q: score("q", { 0: "bad", 1: "ok", 2: "great" }) });
-    expect(wire.q?.criteria).toEqual(["bad", "ok", "great"]);
-    // Key order in the source object does not matter.
-    const shuffled = await send({ q: score("q", { 2: "great", 0: "bad", 1: "ok" }) });
-    expect(shuffled.q?.criteria).toEqual(["bad", "ok", "great"]);
-  });
-
-  it("rejects score maps with gaps or a non-zero start, naming the question", async () => {
-    await expect(send({ q: score("q", { 0: "bad", 2: "great" }) })).rejects.toThrow(
-      'Score question "q" defines scores 0, 2, but scores must run from 0 with no gaps (expected 0, 1)',
-    );
-    await expect(send({ urgency: score("q", { 1: "low", 2: "high" }) })).rejects.toThrow(
-      'Score question "urgency" defines scores 1, 2',
-    );
-  });
-
-  it("rejects non-integer score keys, empty criteria, and empty question sets before sending", async () => {
+  it("rejects non-list score criteria, fewer than two criteria, and empty question sets before sending", async () => {
     const { fetch, requests } = mockFetch(() => json(SYSTEM_ONE_RESPONSE));
     const client = new TypeSafeClient({ apiKey: "k", fetch });
     // biome-ignore lint/suspicious/noExplicitAny: deliberately malformed, as a JS caller might send
     const bad = (criteria: any) =>
-      client.systemOne({ state: "s", questions: { q: score("q", criteria) } });
-    expect(() => bad({ 1.5: "x" })).toThrow(TypeSafeError);
-    expect(() => bad({ "-1": "x" })).toThrow("non-negative integers");
-    expect(() => bad({})).toThrow("at least one score");
-    expect(() => bad([])).toThrow("at least one score");
+      client.systemOne({ state: "s", questions: { q: { type: "score", criteria } } });
+    expect(() => bad({ 0: "bad", 1: "ok" })).toThrow(TypeSafeError);
+    expect(() => bad({ 0: "bad", 1: "ok" })).toThrow(
+      'Score question "q" has criteria that are not a list',
+    );
+    expect(() => bad([])).toThrow(
+      'Score question "q" has 0 criteria; at least two scores are required.',
+    );
+    expect(() => bad(["only"])).toThrow("at least two scores");
     expect(() => client.systemOne({ state: "s", questions: {} })).toThrow(
       "At least one question is required",
     );
     expect(requests).toHaveLength(0);
-  });
-
-  it("does not mutate the caller's questions", async () => {
-    const questions = { q: score("q", { 0: "bad", 1: "ok" }) };
-    await send(questions);
-    expect(questions.q.criteria).toEqual({ 0: "bad", 1: "ok" });
   });
 });
 
@@ -436,22 +410,17 @@ describe("1.0 primitive contract", () => {
     expect(requests).toHaveLength(1);
   });
 
-  it("forwards extra fields and null without losing score normalization", async () => {
+  it("forwards extra fields and null", async () => {
     const { fetch, requests } = mockFetch(() => json(SYSTEM_ONE_RESPONSE));
     const client = new TypeSafeClient({ apiKey: "k", fetch });
     const request = {
       state: "s",
-      questions: { q: score("?", { 0: "low", 1: "high" }) },
+      questions: { q: score("?", ["low", "high"]) },
       future_option: null,
       nested: { enabled: true },
     };
     await client.systemOne(request);
-    expect(requests[0]?.body).toEqual({
-      ...request,
-      model: "jev-latest",
-      questions: { q: { type: "score", instructions: "?", criteria: ["low", "high"] } },
-    });
-    expect(request.questions.q.criteria).toEqual({ 0: "low", 1: "high" });
+    expect(requests[0]?.body).toEqual({ ...request, model: "jev-latest" });
     await client.systemOne({ state: "s", questions: { q: noul("?") } });
     expect(requests[1]?.body).not.toHaveProperty("future_option");
   });

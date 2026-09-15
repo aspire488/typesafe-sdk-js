@@ -84,23 +84,6 @@ describeLive("live API", () => {
     expect(sum(urgency.probabilities)).toBeCloseTo(1, 1);
   });
 
-  it("accepts a score map, which is sent as a list", async () => {
-    const data = await client.systemOne({
-      state: ticket,
-      questions: {
-        refundRisk: score("How likely is a refund demand?", {
-          0: "unlikely",
-          1: "possible",
-          2: "likely",
-        }),
-      },
-    });
-    show("score map", data.answers.refundRisk);
-    expect(data.answers.refundRisk.legend).toEqual({ 0: "unlikely", 1: "possible", 2: "likely" });
-    expect(data.answers.refundRisk.score).toBeGreaterThanOrEqual(0);
-    expect(data.answers.refundRisk.score).toBeLessThanOrEqual(2);
-  });
-
   it("accepts rich descriptions and one-sided noul criteria", async () => {
     const data = await client.systemOne({
       state: ticket,
@@ -145,7 +128,7 @@ describeLive("live API", () => {
 
   it("surfaces server-side validation errors readably", async () => {
     // A description type the SDK does not validate but the API rejects, to see how a 422 renders.
-    const malformed = { q: score("?", [123 as unknown as string]) };
+    const malformed = { q: score("?", [123 as unknown as string, "ok"]) };
     const err = await client
       .systemOne({ state: "x", questions: malformed }, { retry: { maxRetries: 0 } })
       .catch((e: unknown) => e);
@@ -156,8 +139,10 @@ describeLive("live API", () => {
 
   it("catches shapes the API would reject before sending", () => {
     expect(() => client.systemOne({ state: "x", questions: {} })).toThrow(TypeSafeError);
-    expect(() =>
-      client.systemOne({ state: "x", questions: { q: score("?", { 0: "a", 2: "c" }) } }),
-    ).toThrow(TypeSafeError);
+    // biome-ignore lint/suspicious/noExplicitAny: deliberately malformed, as a JS caller might send
+    const empty: any = [];
+    expect(() => client.systemOne({ state: "x", questions: { q: score("?", empty) } })).toThrow(
+      TypeSafeError,
+    );
   });
 });

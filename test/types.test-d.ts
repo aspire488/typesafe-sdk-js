@@ -25,7 +25,7 @@ describe("systemOne result inference", () => {
       questions: {
         a: noul("x"),
         b: choice("y", { yes: null, no: "desc" }),
-        c: score("z", { 0: "bad", 1: "ok" }),
+        c: score("z", ["bad", "ok"]),
       },
     });
 
@@ -41,9 +41,7 @@ describe("systemOne result inference", () => {
       readonly no: number;
     }>();
 
-    expectTypeOf(r.answers.c).toEqualTypeOf<
-      ScoreResponse<{ readonly 0: "bad"; readonly 1: "ok" }>
-    >();
+    expectTypeOf(r.answers.c).toEqualTypeOf<ScoreResponse<readonly ["bad", "ok"]>>();
     expectTypeOf(r.answers.c.score).toEqualTypeOf<number>();
     expectTypeOf(r.answers.c.legend).toEqualTypeOf<{ readonly 0: "bad"; readonly 1: "ok" }>();
     expectTypeOf(r.answers.c.probabilities).toEqualTypeOf<{
@@ -86,7 +84,7 @@ describe("systemOne result inference", () => {
   });
 
   it("degrades to numeric indexing for non-literal score lists", async () => {
-    const list: [string, ...string[]] = ["a", "b"];
+    const list: [string, string, ...string[]] = ["a", "b"];
     const r = await client.systemOne({ state: "s", questions: { c: score("z", list) } });
     expectTypeOf(r.answers.c.probabilities).toEqualTypeOf<{ readonly [score: number]: number }>();
     expectTypeOf(r.answers.c.legend).toEqualTypeOf<{ readonly [score: number]: string }>();
@@ -138,8 +136,8 @@ describe("systemOne result inference", () => {
   });
 });
 
-describe("criteria maps", () => {
-  it("rejects label-list shorthand", () => {
+describe("criteria shapes", () => {
+  it("rejects label-list shorthand for choice", () => {
     // @ts-expect-error criteria must be a map
     choice("q", ["a", "b"]);
     // @ts-expect-error empty label lists are not maps
@@ -147,6 +145,18 @@ describe("criteria maps", () => {
     const labels: string[] = ["a", "b"];
     // @ts-expect-error dynamic label lists are not maps
     choice("q", labels);
+  });
+
+  it("rejects numeric-keyed maps for score", () => {
+    // @ts-expect-error score criteria must be a list
+    score("q", { 0: "bad", 1: "ok" });
+    // @ts-expect-error empty lists are not valid rubrics
+    score("q", []);
+    // @ts-expect-error a rubric needs at least two levels
+    score("q", ["only"]);
+    const dynamic: string[] = ["bad", "ok"];
+    // @ts-expect-error a plain string[] may be empty
+    score("q", dynamic);
     // @ts-expect-error inference is a client method, not a resource
     client.systemOne.run({ state: "s", questions: { q: noul("?") } });
   });
@@ -157,21 +167,14 @@ describe("question helpers", () => {
     // @ts-expect-error numbers are not valid descriptions
     choice("q", { yes: 1 });
     // @ts-expect-error numbers are not valid descriptions
-    score("q", { 0: 1 });
-    // @ts-expect-error numbers are not valid descriptions
     score("q", [1, 2]);
     score("q", ["ok", null]);
-    score("q", { 0: null, 1: "ok" });
     noul(null, { true: null, false: null });
     noul(null, null);
     noul();
     choice(null, { yes: null });
-    score(null, [null]);
-    // An empty list is not catchable at the type level (it satisfies the map shape); the client
-    // rejects it at runtime instead.
-    score("q", []);
+    score(null, [null, null]);
     choice("q", { yes: null, no: "ok", maybe: { detail: "rich" } });
-    score("q", { 0: "bad", 1: "ok", 2: { detail: "rich" } });
     score("q", ["bad", "ok", { detail: "rich" }]);
     noul("q", { true: { detail: "rich" } });
     noul("q", { false: "only one side" });
@@ -184,13 +187,16 @@ describe("question helpers", () => {
         noul: { type: "noul" },
         choice: { type: "choice", criteria: { yes: null, no: [null, "example"] } },
         list: score(null, [null, "high"]),
-        map: { type: "score", criteria: { 0: null, 1: "high" } },
+        literal: { type: "score", criteria: [null, "high"] },
       },
     });
     expectTypeOf(r.answers.noul).toEqualTypeOf<NoulResponse>();
     expectTypeOf(r.answers.choice.choice).toEqualTypeOf<"yes" | "no">();
     expectTypeOf(r.answers.list.legend).toEqualTypeOf<{ readonly 0: null; readonly 1: "high" }>();
-    expectTypeOf(r.answers.map.legend).toEqualTypeOf<{ readonly 0: null; readonly 1: "high" }>();
+    expectTypeOf(r.answers.literal.legend).toEqualTypeOf<{
+      readonly 0: null;
+      readonly 1: "high";
+    }>();
     expectTypeOf(r.answers.list.probabilities).toEqualTypeOf<{
       readonly 0: number;
       readonly 1: number;
@@ -200,7 +206,7 @@ describe("question helpers", () => {
       questions: {
         q: noul([null, "instructions"], { true: [null, "criterion"] }),
         c: choice(["instructions"], { yes: [null, "criterion"] }),
-        s: score(["instructions"], [[null, "criterion"]]),
+        s: score(["instructions"], [[null, "criterion"], null]),
       },
     });
   });
@@ -209,8 +215,7 @@ describe("question helpers", () => {
     expectTypeOf(noul("x")).toMatchTypeOf<Question>();
     expectTypeOf(choice("x", { a: null })).toMatchTypeOf<Question>();
     expectTypeOf(choice("x", { a: null, b: null })).toMatchTypeOf<Question>();
-    expectTypeOf(score("x", { 0: "a" })).toMatchTypeOf<Question>();
-    expectTypeOf(score("x", ["a"])).toMatchTypeOf<Question>();
+    expectTypeOf(score("x", ["a", "b"])).toMatchTypeOf<Question>();
   });
 });
 

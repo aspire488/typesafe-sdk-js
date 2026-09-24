@@ -12,7 +12,7 @@ import {
   TypeSafeError,
   VERSION,
 } from "../src";
-import { DEFAULT_BASE_URL, DEFAULT_MODEL } from "../src/client";
+import { DEFAULT_BASE_URL, DEFAULT_MODEL, MAX_TIMEOUT_MS } from "../src/client";
 import { DEFAULT_LOG_LEVEL, LOG_LEVELS } from "../src/logging";
 import { DEFAULT_RETRY_POLICY, DEFAULT_TIMEOUT_MS } from "../src/retry";
 import { describeRuntime } from "../src/runtime";
@@ -84,6 +84,26 @@ describe("TypeSafeClient configuration", () => {
     expect("apiKey" in client).toBe(false);
     expect(Object.values(client)).not.toContain("super-secret");
     expect(JSON.stringify(client)).not.toContain("super-secret");
+  });
+
+  it("accepts the maximum supported timer delay", () => {
+    const client = new TypeSafeClient({ apiKey: "k", timeout: MAX_TIMEOUT_MS });
+    expect(client.timeout).toBe(MAX_TIMEOUT_MS);
+  });
+
+  it("rejects timeouts above the runtime timer maximum", () => {
+    expect(() => new TypeSafeClient({ apiKey: "k", timeout: MAX_TIMEOUT_MS + 1 })).toThrow(
+      `\`timeout\` must be at most ${MAX_TIMEOUT_MS} milliseconds`,
+    );
+  });
+
+  it("rejects oversized per-call timeout overrides before sending", async () => {
+    const { fetch, requests } = mockFetch(() => json({ models: [] }));
+    const client = new TypeSafeClient({ apiKey: "k", fetch });
+    await expect(client.models.list({ timeout: MAX_TIMEOUT_MS + 1 })).rejects.toThrow(
+      `\`timeout\` must be at most ${MAX_TIMEOUT_MS} milliseconds`,
+    );
+    expect(requests).toHaveLength(0);
   });
 
   it("treats empty and whitespace-only env values as unset", () => {

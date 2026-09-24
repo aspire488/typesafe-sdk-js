@@ -40,6 +40,7 @@ import { VERSION } from "./version";
 
 export const DEFAULT_BASE_URL = "https://api.typesafe.ai";
 export const DEFAULT_MODEL = "jev-latest";
+export const MAX_TIMEOUT_MS = 2_147_483_647;
 
 // ---------------------------------------------------------------------------
 // Construction-time checks
@@ -78,6 +79,11 @@ const assertPositiveMs = (name: string, value: number): number => {
   if (!Number.isFinite(value) || value <= 0) {
     throw new TypeSafeError(
       `\`${name}\` must be a positive number of milliseconds, got ${String(value)}.`,
+    );
+  }
+  if (value > MAX_TIMEOUT_MS) {
+    throw new TypeSafeError(
+      `\`${name}\` must be at most ${MAX_TIMEOUT_MS} milliseconds, got ${String(value)}.`,
     );
   }
   return value;
